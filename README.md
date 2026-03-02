@@ -9,3 +9,4 @@ Sistema para reconhecimento de gestos em libras, utilizando a biblioteca mediapi
 ```sudo apt install python3-xyz```<br><br>
 ```pip install mediapipe opencv-python tensorflow scikit-learn numpy pandas```<br><br>
 ```sudo apt install python3-pip```<br><br>
+```pip install seaborn matplotlib ```

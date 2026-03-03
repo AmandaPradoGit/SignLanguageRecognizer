@@ -59,6 +59,28 @@ while True:
 
     # Verifica se alguma mão foi detectada no frame atual
     if result.hand_landmarks:
+        for idx, hand_landmarks in enumerate(result.hand_landmarks):
+
+            # Descobrir se é esquerda ou direita
+            label = result.handedness[idx][0].category_name
+            
+            # Inverte a lógica por causa do cv2.flip(frame, 1)
+            if label == "Left":
+                hand_label = "Right"
+                cor = (0, 255, 0) # Verde para Direita
+            else:
+                hand_label = "Left"
+                cor = (255, 0, 0) # Azul para Esquerda
+
+            for landmark in hand_landmarks:
+                x = int(landmark.x * frame.shape[1])
+                y = int(landmark.y * frame.shape[0])
+                cv2.circle(frame, (x, y), 5, cor, -1)
+
+            cv2.putText(frame, hand_label,
+                        (10, 40 + idx*40),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        1, cor, 2)
         for hand_landmarks in result.hand_landmarks:
 
             # --- NORMALIZAÇÃO ESPACIAL (INVARIÂNCIA DE TRANSLAÇÃO) ---

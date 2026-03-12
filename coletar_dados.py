@@ -4,8 +4,9 @@ import csv  # Manipulação de arquivos de dados estruturados
 import os  # Interface com o sistema operacional para gestão de arquivos
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
+import time
 
-# --- CONFIGURAÇÃO DO MODELO DE INFERÊNCIA ---
+# --- CONFIGURAÇÃO DO MODELO---
 # Define o arquivo binário que contém a rede neural treinada para detecção de mãos
 model_path = "hand_landmarker.task"
 
@@ -22,6 +23,15 @@ detector = vision.HandLandmarker.create_from_options(options)
 # Inicializa a captura de vídeo através da webcam padrão (índice 0)
 cap = cv2.VideoCapture(0)
 
+# --- CONFIGURAÇÕES DE COLETA POR TEMPO ---
+duracao_gravacao = 2.0  # Tempo de captura para cada clique (segundos)
+frames_por_segundo_desejados = 10 # Quantos frames salvar por segundo (evita arquivos pesados)
+intervalo_frames = 1 / frames_por_segundo_desejados
+ultimo_frame_salvo = 0
+gravando = False
+letra_atual = ""
+inicio_tempo = 0
+
 # --- PREPARAÇÃO DO DATASET ---
 arquivo = "dataset.csv"
 # Se o arquivo não existir, cria e escreve o cabeçalho (Header)
@@ -35,7 +45,8 @@ if not os.path.exists(arquivo):
         header.append("label") # Coluna de destino (target/classe)
         writer.writerow(header)
 
-print("Pressione a letra desejada no teclado para rotular.")
+print("Pressione a letra desejada para iniciar a gravação de 2 segundos.")
+print("Movimente a mão levemente (perto/longe/ângulos) durante a gravação.")
 print("Pressione ESC para sair.")
 
 # --- LOOP PRINCIPAL DE PROCESSAMENTO ---
@@ -81,43 +92,55 @@ while True:
                         (10, 40 + idx*40),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         1, cor, 2)
-        for hand_landmarks in result.hand_landmarks:
-
-            # --- NORMALIZAÇÃO ESPACIAL (INVARIÂNCIA DE TRANSLAÇÃO) ---
-            # Define o ponto 0 (pulso) como a origem (0,0) do sistema de coordenadas local
+            
+            # --- PREPARAÇÃO DOS DADOS (NORMALIZAÇÃO) ---
             base_x = hand_landmarks[0].x
             base_y = hand_landmarks[0].y
+            dados_frame = []
 
-            dados = []
-
-            # Extrai as coordenadas de cada ponto subtraindo a posição do pulso
             for landmark in hand_landmarks:
-                dados.append(landmark.x - base_x)
-                dados.append(landmark.y - base_y)
-                dados.append(landmark.z)
-            
-            # --- CAPTURA DE TECLADO E ROTULAGEM ---
+                dados_frame.append(landmark.x - base_x)
+                dados_frame.append(landmark.y - base_y)
+                dados_frame.append(landmark.z)
+
+            # --- LÓGICA DE CAPTURA INTELIGENTE ---
             tecla = cv2.waitKey(1) & 0xFF
 
-            # Se uma tecla for pressionada (e não for ESC ou vazio)
-            if tecla != 255 and tecla != 27:
-                letra = chr(tecla).upper() # Converte o código da tecla para o caractere da letra
+            # Se apertar uma tecla e não estiver gravando, inicia o processo
+            if tecla != 255 and tecla != 27 and not gravando:
+                letra_atual = chr(tecla).upper()
+                gravando = True
+                inicio_tempo = time.time()
+                ultimo_frame_salvo = 0
+                print(f"Gravando '{letra_atual}'... Mova a mão!")
 
-                # Gravação dos dados: Adiciona a linha de coordenadas + rótulo ao CSV
-                with open(arquivo, mode="a", newline="") as f:
-                    writer = csv.writer(f)
-                    writer.writerow(dados + [letra])
+            # Se estiver no período de gravação
+            if gravando:
+                tempo_passado = time.time() - inicio_tempo
+                
+                if tempo_passado < duracao_gravacao:
+                    # Salva apenas se passou o tempo do intervalo (ex: 0.1s para 10fps)
+                    if tempo_passado - ultimo_frame_salvo >= intervalo_frames:
+                        with open(arquivo, mode="a", newline="") as f:
+                            writer = csv.writer(f)
+                            writer.writerow(dados_frame + [letra_atual])
+                        ultimo_frame_salvo = tempo_passado
+                    
+                    # Feedback visual na tela
+                    cv2.rectangle(frame, (0, 0), (300, 60), (0, 0, 255), -1)
+                    cv2.putText(frame, f"GRAVANDO {letra_atual}: {duracao_gravacao - tempo_passado:.1f}s", 
+                                (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                else:
+                    gravando = False
+                    print(f"Fim da coleta para {letra_atual}.")
 
-                print(f"Salvo: {letra}")
-
-            # Sai do loop interno se ESC for pressionado
-            if tecla == 27:
+            if tecla == 27: # ESC dentro do loop de landmarks
                 break
 
     # Exibe a interface visual para o usuário
     cv2.imshow("Coleta de Dados", frame)
 
-    # Monitora a tecla ESC para encerrar o programa
+    # Monitora a tecla ESC para encerrar o programa fora do loop de landmarks
     if cv2.waitKey(1) & 0xFF == 27:
         break
 

@@ -25,7 +25,7 @@ y = y[indices_validos]
 # --- VALIDAÇÃO CRUZADA ---
 # Avalia a robustez do modelo em 5 dobras antes do treino final
 modelo = RandomForestClassifier(n_estimators=200, random_state=42)
-scores = cross_val_score(modelo, X, y, cv=5)
+scores = cross_val_score(modelo, X, y, cv=10)
 print(f"Acurácia Média (Validação Cruzada): {scores.mean() * 100:.2f}%")
 print(f"Desvio Padrão: {scores.std() * 100:.2f}%")
 

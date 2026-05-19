@@ -45,12 +45,13 @@ while True:
             # Normalização (mesma do treino)
             base_x = hand_landmarks[0].x
             base_y = hand_landmarks[0].y
+            base_z = hand_landmarks[0].z
             dados = []
 
             for landmark in hand_landmarks:
                 dados.append(landmark.x - base_x)
                 dados.append(landmark.y - base_y)
-                dados.append(landmark.z)
+                dados.append(landmark.z - base_z)
 
             # Predição instantânea
             predicao_imediata = modelo.predict([dados])[0]
@@ -78,10 +79,6 @@ while True:
 
     else:
         buffer_predicoes.clear() # Limpa se a mão sair da tela
-
-    # Interface estilizada
-    cv2.putText(frame, "Reconhecimento em tempo real", (180, 40), 
-                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
     cv2.imshow("Reconhecimento Libras", frame)
 

@@ -23,52 +23,54 @@ detector = vision.HandLandmarker.create_from_options(options)
 # Inicializa a captura de vídeo através da webcam padrão (índice 0)
 cap = cv2.VideoCapture(0)
 
-# --- CONFIGURAÇÕES DE COLETA POR TEMPO ---
-duracao_gravacao = 2.0  # Tempo de captura para cada clique (segundos)
-frames_por_segundo_desejados = 10 # Quantos frames salvar por segundo (evita arquivos pesados)
+# --- CONFIGURAÇÃO DE COLETA FIXA ---
+TOTAL_FRAMES = 100
+frames_coletados = 0
+
+frames_por_segundo_desejados = 15
 intervalo_frames = 1 / frames_por_segundo_desejados
 ultimo_frame_salvo = 0
+
 gravando = False
 letra_atual = ""
-inicio_tempo = 0
 
 # --- PREPARAÇÃO DO DATASET ---
 arquivo = "dataset.csv"
-# Se o arquivo não existir, cria e escreve o cabeçalho (Header)
+
 if not os.path.exists(arquivo):
     with open(arquivo, mode="w", newline="") as f:
         writer = csv.writer(f)
         header = []
-        # Gera rótulos para as coordenadas x, y, z de cada um dos 21 pontos da mão
         for i in range(21):
             header += [f"x{i}", f"y{i}", f"z{i}"]
-        header.append("label") # Coluna de destino (target/classe)
+        header.append("label")
         writer.writerow(header)
 
-print("Pressione a letra desejada para iniciar a gravação de 2 segundos.")
-print("Movimente a mão levemente (perto/longe/ângulos) durante a gravação.")
+# abre o arquivo UMA vez (mais eficiente e seguro)
+file = open(arquivo, mode="a", newline="")
+writer = csv.writer(file)
+
+print("Pressione uma tecla (A-Z)")
 print("Pressione ESC para sair.")
 
-# --- LOOP PRINCIPAL DE PROCESSAMENTO ---
+# --- LOOP PRINCIPAL ---
 while True:
-    ret, frame = cap.read() # Captura o frame da câmera
+    ret, frame = cap.read()
     if not ret:
         break
 
-    # Pré-processamento: Inverte a imagem (espelhamento) e converte BGR para RGB (exigência do MediaPipe)
     frame = cv2.flip(frame, 1)
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-    # Converte o frame em um objeto de imagem compatível com o MediaPipe Tasks
     mp_image = mp.Image(
         image_format=mp.ImageFormat.SRGB,
         data=rgb_frame
     )
 
-    # Executa a inferência para detectar a mão e seus pontos de referência
     result = detector.detect(mp_image)
 
-    # Verifica se alguma mão foi detectada no frame atual
+    tecla = cv2.waitKey(1) & 0xFF
+
     if result.hand_landmarks:
         for idx, hand_landmarks in enumerate(result.hand_landmarks):
 
@@ -92,58 +94,57 @@ while True:
                         (10, 40 + idx*40),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         1, cor, 2)
-            
-            # --- PREPARAÇÃO DOS DADOS (NORMALIZAÇÃO) ---
+
+            # --- NORMALIZAÇÃO ---
             base_x = hand_landmarks[0].x
             base_y = hand_landmarks[0].y
+            base_z = hand_landmarks[0].z
+
             dados_frame = []
 
             for landmark in hand_landmarks:
                 dados_frame.append(landmark.x - base_x)
                 dados_frame.append(landmark.y - base_y)
-                dados_frame.append(landmark.z)
+                dados_frame.append(landmark.z - base_z)
 
-            # --- LÓGICA DE CAPTURA INTELIGENTE ---
-            tecla = cv2.waitKey(1) & 0xFF
-
-            # Se apertar uma tecla e não estiver gravando, inicia o processo
+            # --- INICIAR GRAVAÇÃO ---
             if tecla != 255 and tecla != 27 and not gravando:
                 letra_atual = chr(tecla).upper()
                 gravando = True
-                inicio_tempo = time.time()
+                frames_coletados = 0
                 ultimo_frame_salvo = 0
-                print(f"Gravando '{letra_atual}'... Mova a mão!")
+                print(f"Gravando '{letra_atual}'...")
 
-            # Se estiver no período de gravação
+            # --- GRAVAÇÃO CONTROLADA ---
             if gravando:
-                tempo_passado = time.time() - inicio_tempo
-                
-                if tempo_passado < duracao_gravacao:
-                    # Salva apenas se passou o tempo do intervalo (ex: 0.1s para 10fps)
-                    if tempo_passado - ultimo_frame_salvo >= intervalo_frames:
-                        with open(arquivo, mode="a", newline="") as f:
-                            writer = csv.writer(f)
-                            writer.writerow(dados_frame + [letra_atual])
-                        ultimo_frame_salvo = tempo_passado
-                    
-                    # Feedback visual na tela
-                    cv2.rectangle(frame, (0, 0), (300, 60), (0, 0, 255), -1)
-                    cv2.putText(frame, f"GRAVANDO {letra_atual}: {duracao_gravacao - tempo_passado:.1f}s", 
-                                (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-                else:
+                tempo_atual = time.time()
+
+                if (tempo_atual - ultimo_frame_salvo) >= intervalo_frames:
+                    writer.writerow(dados_frame + [letra_atual])
+                    frames_coletados += 1
+                    ultimo_frame_salvo = tempo_atual
+
+                # Feedback visual
+                cv2.rectangle(frame, (0, 0), (320, 60), (0, 0, 255), -1)
+                cv2.putText(frame,
+                            f"{letra_atual}: {frames_coletados}/{TOTAL_FRAMES}",
+                            (10, 40),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.8,
+                            (255, 255, 255),
+                            2)
+
+                # parada exata
+                if frames_coletados >= TOTAL_FRAMES:
                     gravando = False
-                    print(f"Fim da coleta para {letra_atual}.")
+                    print(f"Coleta finalizada para '{letra_atual}'")
 
-            if tecla == 27: # ESC dentro do loop de landmarks
-                break
-
-    # Exibe a interface visual para o usuário
     cv2.imshow("Coleta de Dados", frame)
 
-    # Monitora a tecla ESC para encerrar o programa fora do loop de landmarks
-    if cv2.waitKey(1) & 0xFF == 27:
+    if tecla == 27:
         break
 
 # --- FINALIZAÇÃO ---
+file.close()
 cap.release()  # Libera o hardware da câmera
 cv2.destroyAllWindows()  # Fecha todas as janelas do OpenCV

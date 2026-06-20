@@ -1,3 +1,4 @@
+#realiza a busca por erros no csv
 import pandas as pd
 
 # Carrega o dataset
@@ -13,7 +14,7 @@ for col in features.columns:
     invalidos = df[pd.to_numeric(df[col], errors='coerce').isna()]
     
     if not invalidos.empty:
-        print(f"⚠️ Erro na coluna [{col}]:")
+        print(f" Erro na coluna [{col}]:")
         for idx, row in invalidos.iterrows():
             print(f"   -> Linha {idx}: Valor encontrado foi '{row[col]}'")
 

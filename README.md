@@ -113,27 +113,3 @@ python3 treinar_modelo.py
 python3 reconhecer_tempo_real.py
 ```
 
-**Observações sobre os arquivos**
-- `modelo_alfabeto.pkl` já existe no repositório e pode ser usado diretamente por `reconhecer_tempo_real.py`.
-- `static/hand_landmarker.task` é requerimento do MediaPipe para alguns pipelines — o arquivo está incluído.
-
-**Formato esperado do dataset**
-- Os scripts usam CSVs com colunas de features extraídas (landmarks) e uma coluna alvo (label). Use `checar_csv.py` para validar o CSV antes de treinar.
-
-**Resolução de problemas comuns**
-- Erro de import (e.g. `No module named mediapipe`): verifique que o venv está ativado e execute `pip install -r requirements.txt`.
-- Webcam não detectada: verifique permissões e teste com `ffmpeg -f video4linux2 -list_formats all -i /dev/video0` ou outro software.
-- Versões incompatíveis do MediaPipe/OpenCV: use as versões em `requirements.txt`.
-
-**Contribuição e Issues**
-- Abra uma issue para bugs ou pedidos de feature.
-
-**Licença**
-- Este projeto está licenciado sob MIT. Veja o arquivo LICENSE (se aplicável) ou adicione uma licença conforme necessário.
-
----
-
-Se quiser, eu posso:
-- atualizar `requirements.txt` com versões recomendadas;
-- adicionar um `LICENSE`;
-- ou incluir instruções mais detalhadas para `coletar_dados.py` e `treinar_modelo.py`.

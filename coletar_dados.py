@@ -8,7 +8,8 @@ import time
 
 # --- CONFIGURAÇÃO DO MODELO---
 # Define o arquivo binário que contém a rede neural treinada para detecção de mãos
-model_path = "hand_landmarker.task"
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+model_path = os.path.join(static_dir, "hand_landmarker.task")
 
 # Configura as opções do MediaPipe: aponta o modelo e define limites (apenas 1 mão)
 base_options = python.BaseOptions(model_asset_path=model_path)

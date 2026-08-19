@@ -1,15 +1,18 @@
 import cv2
 import mediapipe as mp
 import joblib
+import os
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from collections import Counter # Para contar as predições mais frequentes
 
-# Carregar modelo treinado
-modelo = joblib.load("modelo_alfabeto.pkl")
+# Carregar modelo treinado (do diretório static/)
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+modelo_path = os.path.join(static_dir, "modelo_alfabeto.pkl")
+modelo = joblib.load(modelo_path)
 
-# Configurar MediaPipe
-model_path = "hand_landmarker.task"
+# Configurar MediaPipe (task file em static/)
+model_path = os.path.join(static_dir, "hand_landmarker.task")
 base_options = python.BaseOptions(model_asset_path=model_path)
 options = vision.HandLandmarkerOptions(
     base_options=base_options,

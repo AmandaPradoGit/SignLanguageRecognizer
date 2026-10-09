@@ -8,8 +8,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 N_LANDMARKS = 21
-LANDMARK_REFERENCIA = 9  # base do dedo médio, usado p/ escala
-PONTAS_DEDOS = [4, 8, 12, 16, 20]  # polegar, indicador, médio, anelar, mindinho
+LANDMARK_REFERENCIA = 9  # Base do dedo médio, usado para escala
+PONTAS_DEDOS = [4, 8, 12, 16, 20]  # Polegar, indicador, médio, anelar, mindinho
 
 
 # --- FUNÇÕES DE FEATURE ENGINEERING ---
@@ -45,9 +45,51 @@ def adicionar_features_distancia(df):
     return df
 
 
+def adicionar_features_orientacao_e_cruzamento(df):
+    """
+    Adiciona descritores geométricos direcionados para diferenciar T/F e R/U.
+    """
+    df = df.copy()
+
+    # --- 1. Features para T vs F (Polegar vs Indicador) ---
+    # Ângulo no plano XY entre a ponta do polegar (4) e a base do indicador (5)
+    df['angulo_polegar_indicador'] = np.arctan2(
+        df['y4'] - df['y5'], 
+        df['x4'] - df['x5']
+    )
+    # Posição relativa cartesiana e de profundidade (Z)
+    df['f_vs_t_sign_x'] = df['x4'] - df['x5']
+    df['f_vs_t_sign_z'] = df['z4'] - df['z5']
+
+    # --- 2. Features para R vs U (Cruzamento e sobreposição lateral) ---
+    # Diferença no eixo X entre as pontas do indicador (8) e médio (12)
+    df['cruzamento_indicador_medio'] = df['x8'] - df['x12']
+
+    return df
+
+
+def adicionar_features_letra_i(df):
+    """
+    Adiciona a extensão e altura do dedo mínimo (mindinho) 
+    para diferenciar a letra I (mindinho estendido) da letra A (mão totalmente fechada).
+    """
+    df = df.copy()
+    
+    # Elevação vertical (Y) e distância euclidiana da ponta do mindinho (20) em relação ao pulso (0)
+    df['mindinho_extensao_y'] = df['y0'] - df['y20']
+    df['mindinho_dist_pulso'] = np.sqrt(df['x20']**2 + df['y20']**2 + df['z20']**2)
+    
+    # Relação de posição vertical entre o mindinho (20) e o indicador (8)
+    df['mindinho_vs_indicador_y'] = df['y8'] - df['y20']
+    
+    return df
+
+
 def preparar_features(df):
     """Pipeline completo de feature engineering."""
     df = adicionar_features_distancia(df)
+    df = adicionar_features_orientacao_e_cruzamento(df)
+    df = adicionar_features_letra_i(df)
     return df
 
 
@@ -127,7 +169,7 @@ print(f"Acurácia no Dataset Externo (Apenas Letras Comuns): {acuracia_ext * 100
 print("\nRelatório de Classificação - Dados Externos (Kaggle):")
 print(classification_report(y_ext_filtrado, y_pred_ext, labels=classes_comuns, zero_division=0))
 
-# Matriz de Confusão com eixos perfeitamente alinhados (classes_comuns no X e no Y)
+# Matriz de Confusão com eixos perfeitamente alinhados
 plt.figure(figsize=(10, 8))
 cm_ext = confusion_matrix(y_ext_filtrado, y_pred_ext, labels=classes_comuns)
 sns.heatmap(cm_ext, annot=True, fmt='d', cmap='Reds',

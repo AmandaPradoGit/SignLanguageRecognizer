@@ -7,36 +7,34 @@ from mediapipe.tasks.python import vision
 import time
 
 # --- CONFIGURAÇÃO DO MODELO---
-# Define o arquivo binário que contém a rede neural treinada para detecção de mãos
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 model_path = os.path.join(static_dir, "hand_landmarker.task")
 
-# Configura as opções do MediaPipe: aponta o modelo e define limites (apenas 1 mão)
 base_options = python.BaseOptions(model_asset_path=model_path)
 options = vision.HandLandmarkerOptions(
     base_options=base_options,
     num_hands=1
 )
 
-# Inicializa o detector de pontos de referência (landmarks) a partir das configurações
 detector = vision.HandLandmarker.create_from_options(options)
 
-# Inicializa a captura de vídeo através da webcam padrão (índice 0)
 cap = cv2.VideoCapture(0)
 
 # --- CONFIGURAÇÃO DE COLETA FIXA ---
 TOTAL_FRAMES = 100
 frames_coletados = 0
 
-frames_por_segundo_desejados = 15
+frames_por_segundo_desejados = 5
 intervalo_frames = 1 / frames_por_segundo_desejados
 ultimo_frame_salvo = 0
 
 gravando = False
 letra_atual = ""
 
+LANDMARK_REFERENCIA = 9  # base do dedo médio, usado p/ normalizar escala
+
 # --- PREPARAÇÃO DO DATASET ---
-arquivo = "dataset.csv"
+arquivo = "dataset_limpo.csv"
 
 if not os.path.exists(arquivo):
     with open(arquivo, mode="w", newline="") as f:
@@ -47,7 +45,6 @@ if not os.path.exists(arquivo):
         header.append("label")
         writer.writerow(header)
 
-# abre o arquivo UMA vez (mais eficiente e seguro)
 file = open(arquivo, mode="a", newline="")
 writer = csv.writer(file)
 
@@ -75,16 +72,14 @@ while True:
     if result.hand_landmarks:
         for idx, hand_landmarks in enumerate(result.hand_landmarks):
 
-            # Descobrir se é esquerda ou direita
+            # Descobrir se é esquerda ou direita (já corrigido pelo flip)
             label = result.handedness[idx][0].category_name
-            
-            # Inverte a lógica por causa do cv2.flip(frame, 1)
             if label == "Left":
                 hand_label = "Right"
-                cor = (0, 255, 0) # Verde para Direita
+                cor = (0, 255, 0)
             else:
                 hand_label = "Left"
-                cor = (255, 0, 0) # Azul para Esquerda
+                cor = (255, 0, 0)
 
             for landmark in hand_landmarks:
                 x = int(landmark.x * frame.shape[1])
@@ -101,12 +96,29 @@ while True:
             base_y = hand_landmarks[0].y
             base_z = hand_landmarks[0].z
 
+            # ponto de referência já com pulso zerado (pra calcular escala)
+            ref = hand_landmarks[LANDMARK_REFERENCIA]
+            escala = ((ref.x - base_x) ** 2 +
+                      (ref.y - base_y) ** 2 +
+                      (ref.z - base_z) ** 2) ** 0.5
+            if escala < 1e-6:
+                escala = 1e-6
+
             dados_frame = []
 
             for landmark in hand_landmarks:
-                dados_frame.append(landmark.x - base_x)
-                dados_frame.append(landmark.y - base_y)
-                dados_frame.append(landmark.z - base_z)
+                x_norm = (landmark.x - base_x) / escala
+                y_norm = (landmark.y - base_y) / escala
+                z_norm = (landmark.z - base_z) / escala
+
+                # Padroniza handedness: tudo tratado como mão DIREITA.
+                # Usa hand_label (já corrigido pelo flip) pra decidir.
+                if hand_label == "Left":
+                    x_norm = -x_norm
+
+                dados_frame.append(x_norm)
+                dados_frame.append(y_norm)
+                dados_frame.append(z_norm)
 
             # --- INICIAR GRAVAÇÃO ---
             if tecla != 255 and tecla != 27 and not gravando:
@@ -125,7 +137,6 @@ while True:
                     frames_coletados += 1
                     ultimo_frame_salvo = tempo_atual
 
-                # Feedback visual
                 cv2.rectangle(frame, (0, 0), (320, 60), (0, 0, 255), -1)
                 cv2.putText(frame,
                             f"{letra_atual}: {frames_coletados}/{TOTAL_FRAMES}",
@@ -135,7 +146,6 @@ while True:
                             (255, 255, 255),
                             2)
 
-                # parada exata
                 if frames_coletados >= TOTAL_FRAMES:
                     gravando = False
                     print(f"Coleta finalizada para '{letra_atual}'")
@@ -147,5 +157,5 @@ while True:
 
 # --- FINALIZAÇÃO ---
 file.close()
-cap.release()  # Libera o hardware da câmera
-cv2.destroyAllWindows()  # Fecha todas as janelas do OpenCV
+cap.release()
+cv2.destroyAllWindows()

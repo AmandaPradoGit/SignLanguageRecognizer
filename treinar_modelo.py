@@ -8,7 +8,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 # --- CARREGAMENTO DO DATASET ---
-dados = pd.read_csv("dataset.csv")
+dados = pd.read_csv("dataset_limpo.csv")
 
 # --- LIMPEZA E SEPARAÇÃO ---
 # X contém as features. O drop('label') remove a coluna de texto.
